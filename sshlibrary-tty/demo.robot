@@ -41,6 +41,8 @@ Suite Teardown         Close All Connections
 Execute stty command
     [Documentation]    Execute Command can be used to ran commands on the remote machine.
     ...                The keyword returns the standard output by default.
+    ${connection}=  Get Connection
+    Log  ${connection}
     ${stdout}  ${stderr}  ${rc}=         Execute Command  stty  return_stdout=True   return_stderr=True  return_rc=True
     Log  RC=${rc}  console=True
     Log  STDOUT=${stdout}  console=True
@@ -49,4 +51,4 @@ Execute stty command
 *** Keywords ***
 Open Connection And Log In
    Open Connection     ${HOST}
-   Login               ${USERNAME}        ${PASSWORD}  allow_agent=True
+   Login               ${USERNAME}        ${PASSWORD}
