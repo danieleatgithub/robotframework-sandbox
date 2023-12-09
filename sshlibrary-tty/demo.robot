@@ -1,9 +1,15 @@
 *** Settings ***
-Documentation          This example demonstrates executing commands on a remote machine
-...                    and getting their output and the return code.
-...
-...                    Notice how connections are handled as part of the suite setup and
-...                    teardown. This saves some time when executing several test cases.
+Documentation   This example show usage of interactive commands and non interactive commands
+...             https://robotframework.org/SSHLibrary/SSHLibrary.html#Interactive%20shells
+...             #username@hostname:~$ stty size
+...             #43 141
+...             #username@hostname:~$ ssh -t localhost stty size
+...             #username@localhost's password:
+...             #43 141
+...             #Connection to localhost closed.
+...             #username@hostname:~$ ssh localhost stty size
+...             #username@localhost's password:
+...             #stty: 'standard input': Inappropriate ioctl for device
 
 Variables  ${CURDIR}/environment.py
 Library                SSHLibrary
@@ -14,41 +20,52 @@ Suite Teardown         Close All Connections
 
 
 *** Test Cases ***
-#Execute Command And Verify Output
-#    [Documentation]    Execute Command can be used to ran commands on the remote machine.
-#    ...                The keyword returns the standard output by default.
-#    ${output}=         Execute Command  echo Hello SSHLibrary!
-#    Log  ${output}
-#    Should Be Equal    ${output}        Hello SSHLibrary!
-#
-#Execute Command And Verify Return Code
-#    [Documentation]    Often getting the return code of the command is enough.
-#    ...                This behaviour can be adjusted as Execute Command arguments.
-#    ${rc}=             Execute Command  echo Success guaranteed.    return_stdout=False    return_rc=True
-#    Should Be Equal    ${rc}            ${0}
-#
-#Executing Commands In An Interactive Session
-#    [Documentation]    Execute Command always executes the command in a new shell.
-#    ...                This means that changes to the environment are not persisted
-#    ...                between subsequent Execute Command keyword calls.
-#    ...                Write and Read Until variants can be used to operate in the same shell.
-#    Write              cd ..
-#    Write              echo Hello from the parent directory!
-#    ${output}=         Read Until       directory!
-#    Log  ${output}
-#    Should End With    ${output}        Hello from the parent directory!
 
-Execute stty command
-    [Documentation]    Execute Command can be used to ran commands on the remote machine.
-    ...                The keyword returns the standard output by default.
-    ${connection}=  Get Connection
-    Log  ${connection}
-    ${stdout}  ${stderr}  ${rc}=         Execute Command  stty  return_stdout=True   return_stderr=True  return_rc=True
-    Log  RC=${rc}  console=True
-    Log  STDOUT=${stdout}  console=True
-    Log  STDERR=${stderr}  console=True
+
+tty example with interactive command
+    [Tags]   demobot
+    Write  stty size
+    ${output}=  Read Until Prompt
+    Should Contain  ${output}  24 80
+    Set Client Configuration  height=48  width=79
+    ${conn}  Get Connection  1
+    Should Be Equal As Integers  ${conn.height}  48
+    Should Be Equal As Integers  ${conn.width}   79
+    Write  stty size
+    ${output}=  Read Until Prompt
+    Should Contain  ${output}  48 79
+    Write  who am i
+    ${output}=  Read Until Prompt
+    Should Contain  ${output}  pts
+    Write  ls /notexist
+    ${output}=  Read Until Prompt
+    Should Contain  ${output}  ls: cannot access '/notexist': No such file or directory
+    [Teardown]  Set Client Configuration  height=24  width=80
+
+tty example with non interactive command
+    [Tags]   demobot
+    ${out}  ${err}  ${rc}   execute command  stty size  return_stderr=True  return_rc=True
+    Should Be Equal As Integers  ${rc}  1
+    Should Contain  ${err}  stty: 'standard input': Inappropriate ioctl for device
+    Set Client Configuration  height=48  width=79
+    ${conn}  Get Connection  1
+    Should Be Equal As Integers  ${conn.height}  48
+    Should Be Equal As Integers  ${conn.width}   79
+    Write  stty size
+    ${output}=  Read Until Prompt
+    Should Contain  ${output}  48 79
+    ${out}  ${err}  ${rc}   execute command  who am i  return_stderr=True  return_rc=True
+    Should Be Equal As Integers  ${rc}  0
+    Should Be Empty   ${out}
+    Should Be Empty   ${err}
+    ${out}  ${err}  ${rc}   execute command  ls /notexist  return_stderr=True  return_rc=True
+    Should Be Equal As Integers  ${rc}  2
+    Should Be Empty   ${out}
+    Should Contain    ${err}  ls: cannot access '/notexist': No such file or directory
+    [Teardown]  Set Client Configuration  height=24  width=80
+
 
 *** Keywords ***
 Open Connection And Log In
-   Open Connection     ${HOST}
+   Open Connection     ${HOST}  prompt=$
    Login               ${USERNAME}        ${PASSWORD}
